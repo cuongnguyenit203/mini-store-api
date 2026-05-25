@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_25_000002) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_25_194738) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -22,6 +22,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_25_000002) do
     t.string "customer_email"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.text "failure_reason"
     t.index ["customer_email", "status"], name: "index_orders_on_customer_email_and_status"
   end
 
