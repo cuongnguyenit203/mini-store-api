@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class OrderProcessingService
   def initialize(sku, quantity)
     @sku = sku
@@ -8,7 +10,7 @@ class OrderProcessingService
     # Mở Transaction để đảm bảo tính toàn vẹn, nếu có lỗi bất kỳ sẽ rollback kho về như cũ
     ActiveRecord::Base.transaction do
       # Khóa dòng sản phẩm để chống tranh chấp (Race Condition)
-      product = Product.lock("FOR UPDATE").find_by(sku: @sku)
+      product = Product.lock('FOR UPDATE').find_by(sku: @sku)
 
       if product.nil?
         Rails.logger.error "🚨 [Service] Không tìm thấy sản phẩm với mã SKU: #{@sku}"
@@ -25,7 +27,7 @@ class OrderProcessingService
       product.update!(stock: product.stock - @quantity)
     end
     true # Trả về true nếu trừ kho thành công ngon lành
-  rescue => e
+  rescue StandardError => e
     Rails.logger.error "❌ [Service Error] Lỗi khi trừ kho: #{e.message}"
     false # Trả về false nếu có bất kỳ lỗi nào xảy ra hoặc bị Rollback
   end

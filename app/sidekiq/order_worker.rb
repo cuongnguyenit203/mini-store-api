@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class OrderWorker
   include Sidekiq::Worker
 
@@ -9,7 +11,7 @@ class OrderWorker
     product_sku = order.product&.sku
 
     if product_sku.blank?
-      order.update!(status: "failed", failure_reason: "Không tìm thấy thông tin sản phẩm.")
+      order.update!(status: 'failed', failure_reason: 'Không tìm thấy thông tin sản phẩm.')
       return
     end
 
@@ -17,12 +19,12 @@ class OrderWorker
     service = OrderProcessingService.new(product_sku, order.quantity)
 
     if service.call
-      order.update!(status: "completed")
+      order.update!(status: 'completed')
       Rails.logger.info "🎉 [Sidekiq] Đơn hàng ##{order.id} xử lý THÀNH CÔNG!"
     else
       order.update!(
-        status: "failed", 
-        failure_reason: "Sản phẩm đã hết hàng hoặc không đủ tồn kho!"
+        status: 'failed',
+        failure_reason: 'Sản phẩm đã hết hàng hoặc không đủ tồn kho!'
       )
       Rails.logger.error "❌ [Sidekiq] Đơn hàng ##{order.id} xử lý THẤT BẠI do hết hàng!"
     end
