@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 class OrderProcessingService
   def initialize(sku, quantity)
     @sku = sku
@@ -7,28 +5,31 @@ class OrderProcessingService
   end
 
   def call
-    # Mở Transaction để đảm bảo tính toàn vẹn, nếu có lỗi bất kỳ sẽ rollback kho về như cũ
-    ActiveRecord::Base.transaction do
-      # Khóa dòng sản phẩm để chống tranh chấp (Race Condition)
+    # Hứng kết quả của cả khối transaction vào một biến
+    result = ActiveRecord::Base.transaction do
       product = Product.lock('FOR UPDATE').find_by(sku: @sku)
 
       if product.nil?
-        Rails.logger.error "🚨 [Service] Không tìm thấy sản phẩm với mã SKU: #{@sku}"
-        raise ActiveRecord::Rollback # Hủy transaction
+        Rails.logger.error "🚨 [Service] Không tìm thấy SKU: #{@sku}"
+        raise ActiveRecord::Rollback # Trả về nil cho biến result
       end
 
-      # Kiểm tra tồn kho
       if product.stock < @quantity
-        Rails.logger.warn "🚨 [Service] Sản phẩm #{product.name} không đủ tồn kho! (Cần: #{@quantity}, Còn: #{product.stock})"
-        raise ActiveRecord::Rollback # Hủy transaction nếu thiếu hàng
+        Rails.logger.warn "🚨 [Service] Không đủ tồn kho cho sản phẩm #{product.name}!"
+        raise ActiveRecord::Rollback # Trả về nil cho biến result
       end
 
-      # Trừ số lượng tồn kho của sản phẩm
+      # Trừ kho nếu đủ hàng
       product.update!(stock: product.stock - @quantity)
+
+      true # 👈 Nếu chạy đến đây ngon lành, biến result sẽ ăn giá trị TRUE
     end
-    true # Trả về true nếu trừ kho thành công ngon lành
+
+    # Cuối cùng, mình kiểm tra biến result xem là true hay nil
+    # Nếu result có giá trị (true) -> hàm call trả về true. Nếu result bị nil -> trả về false!
+    result ? true : false
   rescue StandardError => e
-    Rails.logger.error "❌ [Service Error] Lỗi khi trừ kho: #{e.message}"
-    false # Trả về false nếu có bất kỳ lỗi nào xảy ra hoặc bị Rollback
+    Rails.logger.error "❌ [Service Error] Lỗi hệ thống: #{e.message}"
+    false
   end
 end
