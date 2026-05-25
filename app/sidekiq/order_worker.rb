@@ -1,21 +1,25 @@
 class OrderWorker
   include Sidekiq::Worker
-  # Chỉ định tác vụ này có độ ưu tiên cao nhất (critical)
-  sidekiq_options queue: :critical, retry: 2
 
   def perform(order_id)
     order = Order.find_by(id: order_id)
-    return if order.nil? # Né lỗi nếu đơn hàng vô tình bị xóa trước đó
+    return if order.nil?
 
-    # Gọi Service xử lý trừ kho bãi
-    service = OrderProcessingService.new(order.sku, order.quantity)
+    # Lấy sku của sản phẩm thông qua liên kết (Giả sử Order belongs_to :product)
+    product_sku = order.product&.sku
+
+    if product_sku.blank?
+      order.update!(status: "failed", failure_reason: "Không tìm thấy thông tin sản phẩm.")
+      return
+    end
+
+    # Truyền sku lấy được từ liên kết vào Service Object
+    service = OrderProcessingService.new(product_sku, order.quantity)
 
     if service.call
-      # Nếu Service trả về true -> Trừ kho thành công -> Hoàn thành đơn hàng
       order.update!(status: "completed")
       Rails.logger.info "🎉 [Sidekiq] Đơn hàng ##{order.id} xử lý THÀNH CÔNG!"
     else
-      # Nếu Service trả về false -> Thất bại -> Lưu vết lý do vào DB
       order.update!(
         status: "failed", 
         failure_reason: "Sản phẩm đã hết hàng hoặc không đủ tồn kho!"
